@@ -4,10 +4,10 @@ services:
    ihaskell-notebook:
      build: .
      ports:
-       - "8888:8888"
+       - "9888:9888"
      volumes:
        - ./notebook:/home/jovyan/work
-     restart: always
+     restart: unless-stopped
      environment:
       JUPYTER_ENABLE_LAB: "yes"
       JUPYTER_TOKEN: x

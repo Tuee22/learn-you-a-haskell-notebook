@@ -23,3 +23,4 @@ USER $NB_UID
 
 ENV JUPYTER_ENABLE_LAB=yes
 
+CMD jupyter lab --ip=0.0.0.0 --port=9888 --LabApp.token="" --notebook-dir='/home/jovyan/work' --no-browser --allow-root
