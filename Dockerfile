@@ -1,25 +1,57 @@
-# syntax=docker/dockerfile:1
+# ARM64-friendly IHaskell + JupyterLab (Ubuntu 22.04, runs as root)
+FROM ubuntu:22.04
 
-# Use a prebuilt IHaskell Jupyter image (no compiling).
-ARG BASE_IMAGE=crosscompass/ihaskell-notebook:latest
-FROM ${BASE_IMAGE}
+ARG DEBIAN_FRONTEND=noninteractive
 
-# Base image uses Jupyter Docker Stacks conventions (user jovyan:1000, group users)
-USER root
+# System deps for GHC/Cabal, IHaskell, and Jupyter
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ca-certificates xz-utils git \
+    build-essential pkg-config \
+    libffi-dev libgmp-dev libncurses-dev zlib1g-dev libtinfo6 \
+    libzmq3-dev libmagic1 \
+    python3 python3-venv python3-pip \
+ && rm -rf /var/lib/apt/lists/*
 
-ARG NB_USER=jovyan
-ARG NB_UID=1000
-ARG EXAMPLES_PATH=/home/${NB_USER}/ihaskell_examples
+# ---- Python/Jupyter in a virtualenv (avoids system pip issues) ----
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3 -m venv "${VIRTUAL_ENV}" \
+ && "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir --upgrade pip \
+ && "${VIRTUAL_ENV}/bin/pip" install --no-cache-dir jupyterlab ipykernel ipywidgets
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
 
-# (Optional) copy your example notebooks into the image
-RUN mkdir -p /home/${NB_USER}/learn_you_a_haskell ${EXAMPLES_PATH}
-COPY notebook/*.ipynb /home/${NB_USER}/learn_you_a_haskell/
-COPY notebook/img /home/${NB_USER}/learn_you_a_haskell/img
-COPY notebook_extra/WidgetRevival.ipynb ${EXAMPLES_PATH}/
+# ---- Haskell toolchain via GHCup (ARM64 binaries) ----
+ENV BOOTSTRAP_HASKELL_NONINTERACTIVE=1 \
+    BOOTSTRAP_HASKELL_INSTALL_STACK=never \
+    BOOTSTRAP_HASKELL_GHC_VERSION=9.4.8 \
+    BOOTSTRAP_HASKELL_CABAL_VERSION=recommended
 
-# Fix permissions for the notebook user
-RUN chown -R ${NB_UID}:users /home/${NB_USER}/learn_you_a_haskell ${EXAMPLES_PATH}
+RUN curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | bash -s -- -y \
+ && . "/root/.ghcup/env" \
+ && ghcup install ghc ${BOOTSTRAP_HASKELL_GHC_VERSION} || true \
+ && ghcup set ghc ${BOOTSTRAP_HASKELL_GHC_VERSION} \
+ && ghcup install cabal ${BOOTSTRAP_HASKELL_CABAL_VERSION} || true \
+ && cabal update
 
-# Back to the unprivileged user; Lab is enabled by default
-USER ${NB_UID}
-ENV JUPYTER_ENABLE_LAB=yes
+ENV PATH="/root/.ghcup/bin:/root/.cabal/bin:${PATH}"
+
+# Keep cabal memory usage low and builds reproducible
+RUN printf 'jobs: 1\ndocumentation: False\n' >> /root/.cabal/config || true
+
+# ---- Install IHaskell and register the kernel ----
+# Using -j1 and no docs keeps RAM low on Colima.
+RUN . "/root/.ghcup/env" \
+ && cabal v2-install \
+      -j1 \
+      --disable-documentation \
+      --installdir=/usr/local/bin \
+      --overwrite-policy=always \
+      ihaskell \
+ && ihaskell install --prefix=/usr/local
+
+# Workspace for your notebooks (bind mount lands here)
+WORKDIR /root/work
+
+EXPOSE 8888
+
+# Start JupyterLab as root, no browser, no auth
+CMD jupyter lab --ip=0.0.0.0 --no-browser --allow-root --ServerApp.token=''

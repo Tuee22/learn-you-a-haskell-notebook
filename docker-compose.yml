@@ -1,37 +1,12 @@
 services:
   ihaskell-notebook:
-    # Run the amd64 image via QEMU on Apple Silicon (Colima)
-    platform: linux/amd64
-
+    platform: linux/arm64/v8          # native on Apple Silicon (no emulation)
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        # Override via .env if you want a different tag
-        BASE_IMAGE: ${BASE_IMAGE:-crosscompass/ihaskell-notebook:latest}
-
     ports:
       - "8888:8888"
-
     volumes:
-      # Mount your notebooks into the container workspace
-      - ./notebook:/home/jovyan/work
-
-    environment:
-      # Start in Lab UI
-      JUPYTER_ENABLE_LAB: "yes"
-      # Explicitly disable token-based auth
-      JUPYTER_TOKEN: ""
-
-    # Explicitly disable all auth (token & password) and bind to all interfaces
-    command: >
-      start-notebook.sh
-      --NotebookApp.token=''
-      --NotebookApp.password=''
-      --ServerApp.token=''
-      --ServerApp.password=''
-      --ip=0.0.0.0
-      --no-browser
-
-    # Your requested restart policy
+      # Your notebooks live here inside the container
+      - ./notebook:/root/work
     restart: unless-stopped
