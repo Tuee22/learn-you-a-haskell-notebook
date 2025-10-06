@@ -1,14 +1,25 @@
-version: '3.3'
-
 services:
-   ihaskell-notebook:
-     build: .
-     ports:
-       - "9888:9888"
-     volumes:
-       - ./notebook:/home/jovyan/work
-     restart: unless-stopped
-     environment:
-      JUPYTER_ENABLE_LAB: "yes"
-      JUPYTER_TOKEN: x
+  ihaskell-notebook:
+    # Run amd64 image under QEMU on Apple Silicon (Colima)
+    platform: linux/amd64
 
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # You can override this with an .env file if you want another tag
+        BASE_IMAGE: ${BASE_IMAGE:-crosscompass/ihaskell-notebook:latest}
+
+    ports:
+      - "8888:8888"
+
+    volumes:
+      # Mount your local notebooks into the container workspace
+      - ./notebook:/home/jovyan/work
+
+    environment:
+      JUPYTER_ENABLE_LAB: "yes"
+      # Set a token for access; empty string disables auth for local dev
+      JUPYTER_TOKEN: ""
+
+    restart: unless-stopped

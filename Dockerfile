@@ -1,26 +1,27 @@
-# Dockerfile for mybinder.org
-#
-# Test this Dockerfile:
-#
-#     docker build -t learn-you-a-haskell .
-#     docker run --rm -p 8888:8888 --name learn-you-a-haskell learn-you-a-haskell:latest jupyter lab --ServerApp.token=''
-#
+# syntax=docker/dockerfile:1
 
-FROM ghcr.io/ihaskell/ihaskell-notebook:master@sha256:3619fe7a14c8c17e196760377ef3500a1f8db32c9c51ce83c41b4e213a97f1bf
+# Prebuilt IHaskell Jupyter image from Docker Hub (no compilation).
+# We do NOT hardcode a platform here; compose sets platform: linux/amd64.
+ARG BASE_IMAGE=crosscompass/ihaskell-notebook:latest
+FROM ${BASE_IMAGE}
 
+# The image follows the Jupyter Docker Stacks layout (user jovyan:1000).
 USER root
 
-RUN mkdir /home/$NB_USER/learn_you_a_haskell
-COPY notebook/*.ipynb /home/$NB_USER/learn_you_a_haskell/
-COPY notebook/img /home/$NB_USER/learn_you_a_haskell/img
-RUN chown --recursive $NB_UID:users /home/$NB_USER/learn_you_a_haskell
+ARG NB_USER=jovyan
+ARG NB_UID=1000
+ARG EXAMPLES_PATH=/home/${NB_USER}/ihaskell_examples
 
-ARG EXAMPLES_PATH=/home/$NB_USER/ihaskell_examples
-COPY notebook_extra/WidgetRevival.ipynb $EXAMPLES_PATH/
-RUN chown $NB_UID:users $EXAMPLES_PATH/WidgetRevival.ipynb
+# (Optional) copy your example notebooks into the image.
+# You'll also bind-mount ./notebook -> /home/jovyan/work at runtime.
+RUN mkdir -p /home/${NB_USER}/learn_you_a_haskell ${EXAMPLES_PATH}
+COPY notebook/*.ipynb /home/${NB_USER}/learn_you_a_haskell/
+COPY notebook/img /home/${NB_USER}/learn_you_a_haskell/img
+COPY notebook_extra/WidgetRevival.ipynb ${EXAMPLES_PATH}/
 
-USER $NB_UID
+# Fix ownership to match the notebook user
+RUN chown -R ${NB_UID}:users /home/${NB_USER}/learn_you_a_haskell ${EXAMPLES_PATH}
 
+# Back to the notebook user and ensure JupyterLab UI
+USER ${NB_UID}
 ENV JUPYTER_ENABLE_LAB=yes
-
-CMD jupyter lab --ip=0.0.0.0 --port=9888 --LabApp.token="" --notebook-dir='/home/jovyan/work' --no-browser --allow-root
