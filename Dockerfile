@@ -5,7 +5,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 # System deps for GHC/Cabal, IHaskell, and Jupyter
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates xz-utils git \
+    curl ca-certificates xz-utils git patch \
     build-essential pkg-config \
     libffi-dev libgmp-dev libncurses-dev zlib1g-dev libtinfo6 \
     libzmq3-dev libmagic1 \
@@ -39,13 +39,17 @@ RUN printf 'jobs: 1\ndocumentation: False\n' >> /root/.cabal/config || true
 
 # ---- Install IHaskell and register the kernel ----
 # Using -j1 and no docs keeps RAM low on Colima.
+COPY docker/ihaskell-no-command-lint.patch /tmp/ihaskell-no-command-lint.patch
 RUN . "/root/.ghcup/env" \
+ && cabal get ihaskell-0.12.0.0 \
+ && cd ihaskell-0.12.0.0 \
+ && patch -p1 < /tmp/ihaskell-no-command-lint.patch \
  && cabal v2-install \
       -j1 \
       --disable-documentation \
       --installdir=/usr/local/bin \
       --overwrite-policy=always \
-      ihaskell \
+      . \
  && ihaskell install --prefix=/usr/local
 
 # Workspace for your notebooks (bind mount lands here)
