@@ -1,12 +1,25 @@
 services:
-  ihaskell-notebook:
-    platform: linux/arm64/v8          # native on Apple Silicon (no emulation)
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "8888:8888"
-    volumes:
-      # Your notebooks live here inside the container
-      - ./notebook:/root/work
-    restart: unless-stopped
+   ihaskell-notebook:
+     build: .
+     platform: linux/amd64
+     command: jupyter notebook --ServerApp.ip='0.0.0.0' --ServerApp.token='' --ServerApp.password='' --ServerApp.allow_origin='*' --ServerApp.disable_check_xsrf=True --ServerApp.root_dir='/home/jovyan'
+     ports:
+       - "8888:8888"
+     volumes:
+       - ./notebook:/home/jovyan/work
+     restart: always
+     environment:
+      JUPYTER_ENABLE_LAB: "no"
+      JUPYTER_TOKEN: ""
+      JUPYTER_DISABLE_CHECK_XSRF: "true"
+     deploy:
+       resources:
+         limits:
+           memory: 2G
+           cpus: '2.0'
+     healthcheck:
+       test: ["CMD", "curl", "-f", "http://localhost:8888/api/kernels"]
+       interval: 30s
+       timeout: 10s
+       retries: 3
+
